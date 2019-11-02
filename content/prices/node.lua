@@ -17,7 +17,7 @@ local preise = {
     Absatz,
     {"Snacks, Eis",   "0.50"},
     {"Waffeln",   "0.50"},
-    {"TK-Pizza",   "2,50"},
+    {"TK-Pizza",   "2.50"},
 }
 
 function Preisliste(preise, x, y, spacing, size)
