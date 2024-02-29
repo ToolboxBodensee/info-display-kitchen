@@ -9,11 +9,11 @@ util.resource_loader{
 local Absatz = "absatz"
 
 local preise = {
-    {"Mate",      "1.50"},
+    {"Mate/Fritz Cola",      "1.50"},
     {"Bier/Radler",      "1.50"},
     {"Softdrinks",   "1.00"},
     {"Wasser",    "0.75"},
-    {"Kaffee",    "0.25"},
+    {"Kaffee",    "0.50"},
     Absatz,
     {"Snacks, Eis",   "0.50"},
 }
