@@ -9,59 +9,119 @@ util.resource_loader{
 local Absatz = "absatz"
 
 local preise = {
-    {"Mate/Cola",      "1.60"},
-    {"Bier/Radler",      "1.60"},
-    {"Softdrinks",   "1.00"},
-    {"Wasser",    "1.00"},
---    {"Kaffee",    "0.50"},
-    Absatz,
---    {"Schokoriegel",   "0.50"},
+    {heading = "GETRÄNKE"},
+    {"Wasser, Siebers, Glorietta, Spezi, Karamalz, Oettinger Limo, Mate Cola, Schwarzwald Limo, Mio Cola, Afri Cola, Bluna",    "1.00"},
+
+    {"Fritz Cola, Proviant, Lemonaid, Bio Zisch, Mate, Bier, Radler, Seezüngle, Almdudler",      "1.50"},
+    {"Charitea, Bundaberg, Despo 0.0, Elephant Bay",      "2.00"},
+    {heading = "ESSEN"},
+    {"Eis",   "2.00"},
+    {"Tiefkühlgerichte",   "3.00"},
 }
 
-function Preisliste(preise, x, y, spacing, size)
-    local row
-    local col
-    local next_kaputt
-
-    function select_next()
-        repeat
-            row = math.random(#preise)
-        until preise[row] ~= Absatz
-        local title, price = unpack(preise[row])
-        col = math.random(#title - 1)
-        next_kaputt = sys.now() + math.random() * 60 + 30
+-- Wraps only between comma separated entries, so names never get split.
+local function wrap(text, size, maxw)
+    local toks = {}
+    for tok in text:gmatch("[^,]+") do
+        toks[#toks+1] = tok:match("^%s*(.-)%s*$")
     end
-
-    select_next()
-
-    function draw()
-        local yy = y
-        for n, item in pairs(preise) do
-            if item == Absatz then
-                yy = yy + size
-            else
-                local title, price = unpack(item)
-                if sys.now() > next_kaputt - 3 and n == row then
-                    local a = title:sub(1, col-1)
-                    local b = title:sub(col, col)
-                    local c = title:sub(col+1, col+1)
-                    local d = title:sub(col+2)
-                    title = a .. c .. b .. d
-                    font:write(x, yy, title, size, 1,1,1,1)
-                elseif sys.now() > next_kaputt then
-                    select_next()
-                    font:write(x, yy, title, size, 1,1,1,1)
-                else
-                    font:write(x, yy, title, size, 1,1,1,1)
-                end
-                font:write(x + spacing, yy, price, size, 1,1,1,1)
-                yy = yy + size
-            end
+    local lines, cur = {}, nil
+    for i, tok in ipairs(toks) do
+        if i < #toks then tok = tok .. "," end
+        local try = cur and (cur .. " " .. tok) or tok
+        if cur and font:width(try, size) > maxw then
+            lines[#lines+1] = cur
+            cur = tok
+        else
+            cur = try
         end
     end
-    return {
-        draw = draw;
-    }
+    if cur then lines[#lines+1] = cur end
+    return lines
+end
+
+-- Lays out the table at `size`. Returns rows and total height.
+local function layout(preise, size, area)
+    local line_h = size * 1.08
+    local row_gap = size * 0.4
+    local price_w = 0
+    for _, item in ipairs(preise) do
+        if item ~= Absatz and not item.heading then
+            price_w = math.max(price_w, font:width(item[2], size))
+        end
+    end
+    local name_w = area.w - price_w - size
+    local rows, yy, n_in_cat = {}, 0, 0
+    for _, item in ipairs(preise) do
+        if item == Absatz then
+            yy = yy + size * 0.5
+        elseif item.heading then
+            local hs = size * 0.7
+            if #rows > 0 then yy = yy + size * 0.4 end
+            n_in_cat = 0
+            rows[#rows+1] = {heading = item.heading, hsize = hs, y = area.y + yy}
+            yy = yy + hs + row_gap
+        else
+            local lines = wrap(item[1], size, name_w)
+            local h = size + (#lines - 1) * line_h
+            n_in_cat = n_in_cat + 1
+            rows[#rows+1] = {
+                lines = lines, price = item[2], y = area.y + yy, h = h,
+                band = n_in_cat % 2 == 1,
+            }
+            yy = yy + h + row_gap
+        end
+    end
+    return rows, yy - row_gap, line_h, price_w
+end
+
+function Preisliste(preise, area, max_size, min_size)
+    local rows, size, line_h, price_w
+    for s = max_size, min_size, -2 do
+        local r, h, lh, pw = layout(preise, s, area)
+        rows, size, line_h, price_w = r, s, lh, pw
+        if h <= area.h then break end
+    end
+
+    local rule = resource.create_colored_texture(1, 1, 1, 0.25)
+    local band = resource.create_colored_texture(1, 1, 1, 0.07)
+    local right = area.x + area.w
+    local row, line, col, next_kaputt
+
+    local function select_next()
+        repeat row = rows[math.random(#rows)] until not row.heading
+        line = math.random(#row.lines)
+        col = math.random(math.max(1, #row.lines[line] - 1))
+        next_kaputt = sys.now() + math.random() * 60 + 30
+    end
+    select_next()
+
+    local function draw()
+        if sys.now() > next_kaputt then select_next() end
+        for n, r in ipairs(rows) do
+            if r.heading then
+                font:write(area.x, r.y, r.heading, r.hsize, 1,1,1,0.7)
+                local ry = r.y + r.hsize + size * 0.05
+                rule:draw(area.x - 15, ry, right + 15, ry + 2)
+                goto continue
+            end
+            if r.band then
+                local pad = size * 0.2
+                band:draw(area.x - 15, r.y - pad, right + 15, r.y + r.h + pad)
+            end
+            for i, text in ipairs(r.lines) do
+                if r == row and i == line and sys.now() > next_kaputt - 3 then
+                    text = text:sub(1, col-1) .. text:sub(col+1, col+1) ..
+                           text:sub(col, col) .. text:sub(col+2)
+                end
+                font:write(area.x, r.y + (i - 1) * line_h, text, size, 1,1,1,1)
+            end
+            local pw = font:width(r.price, size)
+            font:write(right - pw, r.y, r.price, size, 1,1,1,1)
+            ::continue::
+        end
+    end
+    return { draw = draw }
 end
 
 local logo_shader = resource.create_shader([[
@@ -90,8 +150,8 @@ local distort_shader = resource.create_shader([[
         gl_FragColor = Color * col;
     }
 ]])
- 
- 
+
+
 local crt_shader = resource.create_shader([[
     uniform float time;
     uniform sampler2D Texture;
@@ -123,56 +183,6 @@ local crt_shader = resource.create_shader([[
     }
 ]])
 
-pictures = util.generator(function()
-    local out = {}
-    for name, _ in pairs(CONTENTS) do
-        if name:match(".*jpg") then
-            out[#out + 1] = name
-        end
-    end
-    return out
-end)
-node.event("content_remove", function(...)
-    pictures:remove(...)
-end)
-
-function PicRotation(x1, y1, x2, y2, time)
-    local image
-    function next_image()
-        image = resource.load_image(pictures.next())
-        switch = sys.now() + time
-    end
-
-    next_image()
-
-    local switch_time = 0.2
-
-    function draw()
-        local remaining = switch - sys.now()
-        local abs = 10
-        if remaining < switch_time then 
-            abs = switch_time - remaining
-        end
-        if remaining > time - switch_time then
-            abs = remaining - time + switch_time
-        end
-        if abs < switch_time then
-            abs = abs / switch_time
-            distort_shader:use{
-                effect = abs * 10 * math.sin(sys.now()) * 3;
-            }
-        end
-            util.draw_correct(image, x1, y1, x2, y2)
-        distort_shader:deactivate()
-        if sys.now() > switch then
-            next_image()
-        end
-    end
-
-    return {
-        draw = draw;
-    }
-end
 
 
 local source = (function()
@@ -212,7 +222,7 @@ function Crapterm(source, x, y, size)
         -- hintippen
         for size = 1, #line do
             steps[#steps+1] = {
-                line:sub(1, size), 
+                line:sub(1, size),
                 0.1 + math.random() * speed
             }
         end
@@ -225,11 +235,11 @@ function Crapterm(source, x, y, size)
             local err_off = math.random(#errors)
             local err = errors:sub(err_off, err_off)
             table.insert(steps, off+1, {
-                base_string .. err, 
+                base_string .. err,
                 0.1 + math.random() * speed
             })
             table.insert(steps, off+2, {
-                base_string, 
+                base_string,
                 0.1 + math.random() * speed / 2
             })
         end
@@ -251,7 +261,7 @@ function Crapterm(source, x, y, size)
         }
         next_step = sys.now() + steps[1][2]
     end
-    
+
     next_line()
 
     function draw()
@@ -278,38 +288,36 @@ function Crapterm(source, x, y, size)
     }
 end
 
-local pic = PicRotation(980, 350, WIDTH-100, HEIGHT-200, 8)
 local term = Crapterm(source, 35, 950, 100)
-local preisliste = Preisliste(preise, 35, 50, 640, 80)
+local preisliste = Preisliste(preise, {x = 35, y = 40, w = WIDTH - 70, h = HEIGHT - 80}, 60, 24)
 
 local countdown = sys.now() + math.random() * 10
 
 function node.render()
     background:draw(0,0,WIDTH,HEIGHT)
     preisliste:draw()
-    term:draw()
-    pic:draw()
-    logo_shader:use()
-        gl.perspective(50,
-            WIDTH/2+60, HEIGHT/2+45, -WIDTH/1.38,
-            WIDTH/2+60, HEIGHT/2+45, 0
-        )
-        gl.pushMatrix()
-            gl.translate(950, -90)
-            gl.rotate(10, 0, 0, 1)
-            gl.translate(0, 200)
-            -- gl.rotate((sys.now()*100) % 180-90, 1, 0, 0)
-            gl.rotate(math.sin(sys.now()/2.0)*15, 1, 0, 0)
-            gl.rotate(math.sin(sys.now()/5.0)*8, 0, 1, 0)
-            gl.translate(0, -200)
-            util.draw_correct(toolbox, 0, 0, 1200, 400, 1,0,0,1)
-        gl.popMatrix()
-        gl.ortho()
-    logo_shader:deactivate()
+    -- term:draw()
+    -- logo_shader:use()
+    --     gl.perspective(50,
+    --         WIDTH/2+60, HEIGHT/2+45, -WIDTH/1.38,
+    --         WIDTH/2+60, HEIGHT/2+45, 0
+    --     )
+    --     gl.pushMatrix()
+    --         gl.translate(1250, 0)
+    --         gl.rotate(10, 0, 0, 1)
+    --         gl.translate(0, 100)
+    --         -- gl.rotate((sys.now()*100) % 180-90, 1, 0, 0)
+    --         gl.rotate(math.sin(sys.now()/2.0)*15, 1, 0, 0)
+    --         gl.rotate(math.sin(sys.now()/5.0)*8, 0, 1, 0)
+    --         gl.translate(0, -100)
+    --         util.draw_correct(toolbox, 0, 0, 600, 200, 1,0,0,1)
+    --     gl.popMatrix()
+    --     gl.ortho()
+    -- logo_shader:deactivate()
     -- util.post_effect(crt_shader, {
     --    time = sys.now(),
     --})
-    
+
     -- local remaining = countdown - sys.now()
     -- if remaining < 0 then
     --     countdown = sys.now() + math.random() * 10
