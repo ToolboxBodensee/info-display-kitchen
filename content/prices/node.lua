@@ -13,7 +13,9 @@ local preise = {
     {"Wasser",    "2.00"},
     {"Softdrinks", "2.50"},
     {"Bier",    "3.50"},
-    {"Punsch / Kaffee",    "3.00"},
+    {"Punsch, Kaffee",    "3.00"},
+    {"Rum-Cola, Tschunk, Gin Tonic",    "4.50"},
+    {"Shot",    "2.00"},
 }
 
 -- Wraps only between comma separated entries, so names never get split.
