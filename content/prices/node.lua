@@ -10,12 +10,13 @@ local Absatz = "absatz"
 
 local preise = {
     {heading = "GETRÄNKE"},
-    {"Wasser",    "2.00"},
-    {"Softdrinks", "2.50"},
-    {"Bier",    "3.50"},
-    {"Punsch, Kaffee",    "3.00"},
-    {"Rum-Cola, Tschunk, Gin Tonic",    "4.50"},
-    {"Shot",    "2.00"},
+    {"Wasser, Siebers, Glorietta, Spezi, Karamalz, Oettinger Limo, Mate Cola, Schwarzwald Limo, Mio Cola, Afri Cola, Bluna",    "1.00"},
+
+    {"Fritz Cola, Proviant, Lemonaid, Bio Zisch, Mate, Bier, Radler, Seezüngle, Almdudler",      "1.50"},
+    {"Charitea, Bundaberg, Despo 0.0, Elephant Bay",      "2.00"},
+    {heading = "ESSEN"},
+    {"Eis",   "2.00"},
+    {"Tiefkühlgerichte",   "3.00"},
 }
 
 -- Wraps only between comma separated entries, so names never get split.
